@@ -41,7 +41,7 @@
 - [ ] kickoff 拍板：LLM 供應商 / 韌體框架 / 時序資料庫（見 CLAUDE.md §3）
 
 ## P1 — L1 邊緣感測層（角色 A）🔒 待硬體
-> 目前由 [middleware/mocksource.py](../middleware/mocksource.py)、[tools/mock_publisher.py](../tools/mock_publisher.py) 模擬替代。
+ 目前由 [middleware/mocksource.py](../middleware/mocksource.py)、[tools/mock_publisher.py](../tools/mock_publisher.py) 模擬替代。
 - [x] 模擬資料來源（mocksource：乾旱→澆水→熱浪劇本，標 `sim:true`）
 - [x] 模擬 MQTT 發布器（tools/mock_publisher.py）
 - [ ] 🔒 接線土壤濕度感測器（GPIO32）並讀值
@@ -100,17 +100,25 @@
 ---
 
 ## 硬體採購
+
+ **供電：** 平常開發 / 展示用 **USB 供電**即可。**簡單功耗實驗只需 INA219/226 串接量測**，不必買 18650 shield。
+
 **MVP（現在就要）**
 - [ ] 電容式土壤濕度感測器 v2.0（抗腐蝕）
 - [ ] 麵包板 + 杜邦線（公對母）
-- [ ] USB 傳輸線
+- [ ] USB 傳輸線（供電 + 燒錄）
 - [x] ESP32-WROOM-32（已有）
 
-**完整功能（之後）**
+**完整功能 — 感測（之後）**
 - [ ] BME280（I2C 溫濕度，已選定）
 - [ ] LDR + 10kΩ 電阻（光照分壓）
-- [ ] TP4056 充電模組 + 18650 鋰電池 + 電池座
-- [ ] 🔒 INA219 / INA226 電壓電流監測模組（功耗實驗用）
+
+**功耗實驗 — 量測（之後）**
+- [ ] INA219 / INA226 電壓電流監測模組（串接量測；簡單功耗量測有這顆就夠）
+
+**可攜 / 電池供電（選用，非必要）**
+- [ ] TP4056 + 18650 鋰電池 + 電池座（＋升壓 / buck-boost，或直接用 18650 shield）
+- [ ] 註：18650 shield 方便「跑」，但升壓器靜態電流會干擾 µA 級睡眠量測 → 要量測請改用 INA219 串接
 
 ---
 
