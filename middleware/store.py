@@ -17,6 +17,15 @@ CREATE TABLE IF NOT EXISTS telemetry (
     PRIMARY KEY (node, ts)
 );
 CREATE INDEX IF NOT EXISTS idx_node_ts ON telemetry(node, ts);
+
+CREATE TABLE IF NOT EXISTS diaries (
+    node   TEXT    NOT NULL,
+    ts     INTEGER NOT NULL,
+    state  TEXT    NOT NULL,
+    diary  TEXT    NOT NULL,
+    PRIMARY KEY (node, ts)
+);
+CREATE INDEX IF NOT EXISTS idx_diary_node_ts ON diaries(node, ts);
 """
 
 
@@ -52,4 +61,40 @@ def recent(conn: sqlite3.Connection, node: str, since_ts: int) -> list[dict]:
         "SELECT * FROM telemetry WHERE node = ? AND ts >= ? ORDER BY ts ASC",
         (node, int(since_ts)),
     )
+    return [dict(r) for r in cur.fetchall()]
+
+
+def recent_by_count(conn: sqlite3.Connection, node: str, limit: int = 60) -> list[dict]:
+    """取最近 limit 筆 telemetry（回傳依時間遞增）。"""
+    cur = conn.execute(
+        "SELECT * FROM telemetry WHERE node = ? ORDER BY ts DESC LIMIT ?",
+        (node, int(limit)),
+    )
+    return list(reversed([dict(r) for r in cur.fetchall()]))
+
+
+def nodes(conn: sqlite3.Connection) -> list[str]:
+    cur = conn.execute("SELECT DISTINCT node FROM telemetry ORDER BY node")
+    return [r["node"] for r in cur.fetchall()]
+
+
+def insert_diary(conn: sqlite3.Connection, pkt: dict) -> None:
+    """pkt = {node, ts, state, diary}（L3 輸出）。"""
+    conn.execute(
+        "INSERT OR REPLACE INTO diaries (node, ts, state, diary) VALUES (?, ?, ?, ?)",
+        (pkt["node"], int(pkt["ts"]), pkt["state"], pkt["diary"]),
+    )
+    conn.commit()
+
+
+def recent_diaries(conn: sqlite3.Connection, node: str | None = None,
+                   limit: int = 50) -> list[dict]:
+    """最新在前。"""
+    if node:
+        cur = conn.execute(
+            "SELECT * FROM diaries WHERE node = ? ORDER BY ts DESC LIMIT ?",
+            (node, int(limit)),
+        )
+    else:
+        cur = conn.execute("SELECT * FROM diaries ORDER BY ts DESC LIMIT ?", (int(limit),))
     return [dict(r) for r in cur.fetchall()]

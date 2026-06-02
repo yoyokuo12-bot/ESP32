@@ -116,7 +116,7 @@ ESP32/
 - **DoD：** 一支假的 publisher 能送 JSON，假的 subscriber 能收到並印出。
 
 ### P1 — 邊緣感測層 (角色 A)
-> **MVP（現階段）：** 只接 GPIO32 土壤濕度；`temp_c`/`humidity_pct` 由韌體填**模擬值**（或改用 [tools/mock_publisher.py](tools/mock_publisher.py) 產生整包模擬資料），維持 schema 完整；**先不做深度睡眠**（always-on 較好除錯）。待 BME280 到貨再接 I2C，把模擬值換成實測。
+**MVP（現階段）：** 只接 GPIO32 土壤濕度；`temp_c`/`humidity_pct` 由韌體填**模擬值**（或改用 [tools/mock_publisher.py](tools/mock_publisher.py) 產生整包模擬資料），維持 schema 完整；**先不做深度睡眠**（always-on 較好除錯）。待 BME280 到貨再接 I2C，把模擬值換成實測。
 
 1. 接線並對齊腳位（MVP：GPIO32 土壤；〔擴充〕GPIO33 光照、GPIO21/22 I2C 溫濕度）。
 2. 感測器讀值；每項 10 次取樣取**中位數**（Median Filter）去突波。
@@ -163,7 +163,7 @@ ESP32/
 ```
 註：簡報 §8 範例曾以 `moisture: 32.5`（已換算）呈現，§9 則以 `moisture_raw 2850` 處理。**兩者擇一、全隊統一**。建議用 raw（土壤/光照走 ADC 需校準），溫濕度因 BME280 為數位 I2C 可直接給物理量。
 
-> **MVP 模擬註記：** 現階段無 BME280／LDR，`temp_c`、`humidity_pct` 由模擬值填入（`light_raw` 可省略），schema 不變。為避免把模擬當實測，模擬封包請加上 `"sim": true`（schema 已允許此選填欄位）；BME280 到貨後移除模擬旗標即為實測，下游 L2/L3 不需改動。
+**MVP 模擬註記：** 現階段無 BME280／LDR，`temp_c`、`humidity_pct` 由模擬值填入（`light_raw` 可省略），schema 不變。為避免把模擬當實測，模擬封包請加上 `"sim": true`（schema 已允許此選填欄位）；BME280 到貨後移除模擬旗標即為實測，下游 L2/L3 不需改動。
 
 ### 6.2 L2 → L3：狀態包 (State Packet)
 ```json
@@ -215,8 +215,9 @@ python -m cognition.generator --state CRITICAL_DROUGHT   # 單一狀態日記
 python -m cognition.generator --demo                     # 串接 L2，跑 L2→L3
 python -m cognition.generator --demo --provider ollama   # 換真實 LLM（需設定）
 
-# 呈現（待實作）
-# python -m app.server                # 啟動儀表板 + 日記網頁
+# 呈現層（離線、零相依；先 seed 再啟動）
+python -m app.seed --reset          # 產生模擬資料寫入 DB（telemetry + 日記）
+python -m app.server                # 啟動網頁 http://127.0.0.1:8000（左儀表板／右日記）
 ```
 
 ---
