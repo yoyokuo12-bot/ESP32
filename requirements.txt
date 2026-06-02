@@ -1,0 +1,13 @@
+# L2 中介處理層 + 模擬工具的相依套件
+# 安裝：python -m pip install -r requirements.txt
+pandas>=2.0
+numpy>=1.24
+jsonschema>=4.0          # （選用）契約驗證
+paho-mqtt>=2.0           # 僅 MQTT 即時路徑需要（ingest.py / tools/mock_publisher.py）
+
+# 測試（選用；不裝也可用各測試檔的 __main__ 直接跑）
+pytest>=7.0
+
+# L3 認知生成層的 LLM SDK（依供應商擇一安裝）：
+openai>=1.0          # provider=openai / ollama / gemini（Gemini 走 OpenAI 相容端點）
+#   anthropic            # 其他供應商（未實作）

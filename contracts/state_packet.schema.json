@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/plants/state_packet.schema.json",
+  "title": "Plant State Packet (L2 -> L3)",
+  "description": "中介層 (L2) 萃取統計狀態後交給認知生成層 (L3) 的封包。LLM 只看 state 與 stats，不看原始 ADC。",
+  "type": "object",
+  "required": ["node", "ts", "state", "stats"],
+  "additionalProperties": false,
+  "properties": {
+    "node": { "type": "string" },
+    "ts": { "type": "integer", "description": "Unix epoch 秒 (UTC)" },
+    "state": {
+      "type": "string",
+      "enum": ["CRITICAL_DROUGHT", "HEAT_STRESS", "WATERING_DETECTED", "LOW_LIGHT", "STABLE"]
+    },
+    "stats": {
+      "type": "object",
+      "required": ["moisture_pct", "moisture_diff_1h"],
+      "additionalProperties": true,
+      "properties": {
+        "moisture_pct": { "type": ["number", "null"] },
+        "moisture_diff_1h": { "type": ["number", "null"] },
+        "temp_c": { "type": ["number", "null"] },
+        "humidity_pct": { "type": ["number", "null"] },
+        "light_pct": { "type": ["number", "null"] },
+        "n_samples": { "type": "integer" },
+        "sim": { "type": "boolean", "description": "true＝此狀態由模擬資料推得" }
+      }
+    }
+  },
+  "examples": [
+    {
+      "node": "plant_01",
+      "ts": 1730000000,
+      "state": "CRITICAL_DROUGHT",
+      "stats": { "moisture_pct": 18.0, "moisture_diff_1h": -3.2, "temp_c": 28.5,
+                 "humidity_pct": 55.0, "light_pct": 60.0, "n_samples": 12, "sim": true }
+    }
+  ]
+}

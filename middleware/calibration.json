@@ -1,0 +1,5 @@
+{
+  "_comment": "電容式土壤濕度感測器 v2.0 兩點校準（ESP32 12-bit ADC，0-4095）。raw 越大代表越乾；到貨後以實測『全乾(空氣中)』與『全濕(泡水)』兩個 raw 值更新。",
+  "moisture": { "raw_dry": 3000, "raw_wet": 1300 },
+  "light": { "raw_dark": 0, "raw_bright": 4095 }
+}

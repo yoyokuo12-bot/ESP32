@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# 祕密金鑰（LLM API key 等，務必不要進版控）
+.env
+
+# L2 產生的資料庫與快取
+middleware/data/
+*.db
+*.sqlite
+
+# 分析用暫存（投影片轉圖等）
+_slides/
