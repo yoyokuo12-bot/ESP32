@@ -17,7 +17,6 @@
 | P2 L2 中介處理 | ✅ 完成 | 含單元測試；待硬體後填真實校準值 |
 | P3 L3 認知生成 | ✅ 完成 | stub / Gemini / OpenAI 皆驗證可用 |
 | P4 呈現層 / 整合 | ✅ MVP 完成 | 端到端跑通、網頁可展示 |
-| P5 實驗與評估 | 🔴 待進行 | 功耗 / 校準 / HCI |
 
 ---
 
@@ -28,11 +27,11 @@
 - [x] DATAFLOW.md（實作資料流、函數相依、演算法）
 - [x] contracts/telemetry.schema.json（L1→L2 合約）
 - [x] contracts/state_packet.schema.json（L2→L3 合約）
-- [x] 各模組 README（middleware / cognition / app / tools / firmware / experiments）
+- [x] 各模組 README（middleware / cognition / app / tools / firmware）
 - [x] docs/TODO.md（本清單）
 
 ## P0 — 環境與骨架（全員）
-- [x] 儲存庫目錄骨架（firmware / middleware / cognition / app / experiments / tools / contracts / common）
+- [x] 儲存庫目錄骨架（firmware / middleware / cognition / app / tools / contracts / common）
 - [x] 凍結介面合約（telemetry / state packet / 狀態 enum 與閾值）
 - [x] `.env` 自動載入（common/env.py）+ `.env.example`、`.gitignore`、`requirements.txt`
 - [x] 假 publisher→subscriber 打通（以離線 `simulate` 等效驗證）
@@ -50,8 +49,8 @@
 - [ ] 🔒 Wi-Fi 連線 → 打包 JSON → MQTT publish（`plants/{node}/telemetry`）
 - [ ] 🔒 編譯旗標一鍵切換「真實 ↔ 模擬」感測來源
 - [ ] 🔒 接 BME280（I2C GPIO21/22）與 LDR（GPIO33），移除對應模擬值
-- [ ] 🔒 深度睡眠（`esp_deep_sleep_start`，RTC 每 4h 喚醒 3–5 秒）
-- [ ] 🔒 DoD：實機定時上傳合規 JSON；睡眠電流量得 µA 級
+- [ ] ⭐ 深度睡眠（選用；省電功能，本專題不做功耗實驗）
+- [ ] 🔒 DoD：實機定時上傳合規 JSON
 
 ## P2 — L2 中介處理層（角色 B）
 - [x] config.py（視窗、路徑、MQTT、.env）
@@ -88,20 +87,11 @@
 - [ ] ⭐ 多盆栽 node 切換選單
 - [ ] ⭐ 數據趨勢圖（濕度/溫度時間軸折線）
 
-## P5 — 實驗與評估（角色 E）🔴 待進行
-- [ ] 🔒 功耗：INA219/226 連續記錄 ≥120 小時，對照組 vs 深度睡眠續航
-- [ ] 🔒 感測校準：5 種含水量砝重（壤質粉砂土）烘乾，計算 CV 與 RMSE
-- [ ] HCI：設計問卷（信任感 / 同理 / 照顧行為）
-- [ ] HCI：招募 ~30 人（22–45 歲）、為期 30 天、A/B 兩組
-- [ ] HCI：研究倫理 / 受試者同意書 / 個資處理
-- [ ] HCI：統計分析與結論
-- [ ] 彙整報告（功耗表 + 校準誤差表 + HCI 結果）
-
 ---
 
 ## 硬體採購
 
- **供電：** 平常開發 / 展示用 **USB 供電**即可。**簡單功耗實驗只需 INA219/226 串接量測**，不必買 18650 shield。
+**供電：** 一律 **USB 供電**即可（本專題不做功耗實驗，不需電池 / INA219）。
 
 **MVP（現在就要）**
 - [ ] 電容式土壤濕度感測器 v2.0（抗腐蝕）
@@ -113,13 +103,6 @@
 - [ ] BME280（I2C 溫濕度，已選定）
 - [ ] LDR + 10kΩ 電阻（光照分壓）
 
-**功耗實驗 — 量測（之後）**
-- [ ] INA219 / INA226 電壓電流監測模組（串接量測；簡單功耗量測有這顆就夠）
-
-**可攜 / 電池供電（選用，非必要）**
-- [ ] TP4056 + 18650 鋰電池 + 電池座（＋升壓 / buck-boost，或直接用 18650 shield）
-- [ ] 註：18650 shield 方便「跑」，但升壓器靜態電流會干擾 µA 級睡眠量測 → 要量測請改用 INA219 串接
-
 ---
 
 ## 下週二展示準備
@@ -128,5 +111,5 @@
 - [ ] 決定展示用哪個供應商（stub 最穩 / 真實 LLM 較驚艷）
 - [ ] 先跑 `python -m app.seed --reset` 準備好資料
 - [ ] 演練展示腳本（讓土壤「變乾→喊渴」對比儀表板）
-- [ ] 投影：架構圖 + DATAFLOW 重點 + 三大難點（FEASIBILITY）
+- [ ] 投影：架構圖 + DATAFLOW 重點 + 難點（FEASIBILITY）
 - [ ] 備援：預錄畫面或截圖（萬一現場網路/額度出問題）
