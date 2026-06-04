@@ -1,6 +1,7 @@
 """L2 儲存層：SQLite 落地 telemetry 並查詢近期視窗。"""
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS diaries (
     ts     INTEGER NOT NULL,
     state  TEXT    NOT NULL,
     diary  TEXT    NOT NULL,
+    stats  TEXT,
     PRIMARY KEY (node, ts)
 );
 CREATE INDEX IF NOT EXISTS idx_diary_node_ts ON diaries(node, ts);
@@ -35,6 +37,11 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.executescript(_SCHEMA)
+    # 舊 DB 遷移：若 diaries 缺 stats 欄位則補上
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(diaries)").fetchall()]
+    if "stats" not in cols:
+        conn.execute("ALTER TABLE diaries ADD COLUMN stats TEXT")
+        conn.commit()
     return conn
 
 
@@ -79,10 +86,12 @@ def nodes(conn: sqlite3.Connection) -> list[str]:
 
 
 def insert_diary(conn: sqlite3.Connection, pkt: dict) -> None:
-    """pkt = {node, ts, state, diary}（L3 輸出）。"""
+    """pkt = {node, ts, state, diary, (stats)}（L3 輸出，stats 選填）。"""
+    stats = pkt.get("stats")
     conn.execute(
-        "INSERT OR REPLACE INTO diaries (node, ts, state, diary) VALUES (?, ?, ?, ?)",
-        (pkt["node"], int(pkt["ts"]), pkt["state"], pkt["diary"]),
+        "INSERT OR REPLACE INTO diaries (node, ts, state, diary, stats) VALUES (?, ?, ?, ?, ?)",
+        (pkt["node"], int(pkt["ts"]), pkt["state"], pkt["diary"],
+         json.dumps(stats, ensure_ascii=False) if stats is not None else None),
     )
     conn.commit()
 
@@ -97,4 +106,11 @@ def recent_diaries(conn: sqlite3.Connection, node: str | None = None,
         )
     else:
         cur = conn.execute("SELECT * FROM diaries ORDER BY ts DESC LIMIT ?", (int(limit),))
-    return [dict(r) for r in cur.fetchall()]
+    rows = [dict(r) for r in cur.fetchall()]
+    for r in rows:
+        if r.get("stats"):
+            try:
+                r["stats"] = json.loads(r["stats"])
+            except Exception:
+                r["stats"] = None
+    return rows

@@ -51,6 +51,7 @@ def run(n: int = 240, dt: int = 300, provider: str | None = None, node: str = "p
         pkt = build_state_packet(rec["node"], rec["ts"], stats)
         if pkt["state"] != last_state:          # 狀態變化才生成日記（貼近實際、也省呼叫）
             diary = generate_diary(pkt, client=client)
+            diary["stats"] = pkt["stats"]      # 附上當下統計，供日記本左頁「觀察便箋」
             store.insert_diary(conn, diary)
             n_diary += 1
             if sleep:
