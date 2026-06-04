@@ -3,14 +3,14 @@
  * @brief L1 邊緣感測層 — 擬人化盆栽幽默日記系統
  *
  * 功能：
- *   F-A1: 讀取 GPIO32 土壤濕度（10 次取樣取中位數）
+ *   F-A1: 讀取 GPIO34 土壤濕度（10 次取樣取中位數）
  *   F-A2: temp_c / humidity_pct 以模擬值填入（MVP 期間，BME280 到貨後改真實讀值）
- *   F-A3: 依 contracts/telemetry.schema.json 打包 JSON，經 MQTT publish (QoS 1)
+ *   F-A3: 依 contracts/telemetry.schema.json 打包 JSON，經 MQTT publish（PubSubClient 僅支援 QoS 0）
  *   F-A4: 編譯旗標 USE_REAL_BME280 一鍵切換真實 ↔ 模擬感測來源
  *
  * 硬體接線（Pin Mapping）:
- *   GPIO 32  → 電容式土壤濕度感測器 v2.0（類比輸出 AOUT）
- *   GPIO 33  → LDR 光照分壓電路（選配，MVP 暫以模擬值）
+ *   GPIO 34  → 電容式土壤濕度感測器 v2.0（類比輸出 AOUT，input-only ADC1）
+ *   GPIO 35  → KY-018 光照（類比輸出，input-only ADC1）
  *   GPIO 21  → BME280 SDA（BME280 到貨後啟用）
  *   GPIO 22  → BME280 SCL（BME280 到貨後啟用）
  *   3V3      → 感測器 VCC
@@ -26,7 +26,10 @@
  */
 
 // ─── 編譯旗標：設為 1 時啟用真實 BME280，0 時使用模擬值 ────────────
-#define USE_REAL_BME280  0   // BME280 到貨後改成 1
+// PlatformIO 可用 build_flags「-D USE_REAL_BME280=1」覆寫；以下僅為未指定時的預設。
+#ifndef USE_REAL_BME280
+#define USE_REAL_BME280  0   // Arduino IDE 請直接在這裡改 0/1
+#endif
 
 // ─── Wi-Fi / MQTT 設定 ── 請見 config.h（複製 config.example.h 填入）────
 
@@ -44,6 +47,7 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <algorithm>   // std::sort
+#include <time.h>      // NTP 校時 / Unix epoch
 #include "config.h"    // Wi-Fi / MQTT 個人設定（已加入 .gitignore）
 
 #if USE_REAL_BME280
@@ -112,6 +116,24 @@ void connectMQTT() {
   }
 }
 
+// ─── NTP 校時：取得 Unix epoch 時間（供 ts 使用）────────────────────
+void syncTime() {
+  configTime(0, 0, "pool.ntp.org", "time.google.com");  // UTC
+  Serial.print("[NTP] 校時中");
+  time_t now = time(nullptr);
+  int tries = 0;
+  while (now < 1700000000 && tries < 20) {  // 等到時間 > 2023 視為已同步
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+    tries++;
+  }
+  if (now < 1700000000)
+    Serial.println("\n[NTP] 校時失敗；ts 暫退回開機秒數（時間不準）");
+  else
+    Serial.printf("\n[NTP] 完成，epoch=%ld\n", (long)now);
+}
+
 // ─── 模擬溫濕度（MVP 期間 BME280 未到貨時使用）─────────────────────
 /**
  * 以正弦函數模擬日夜溫度變化（22–28°C），
@@ -131,7 +153,7 @@ void publishTelemetry() {
   if (!mqttClient.connected()) connectMQTT();
   mqttClient.loop();
 
-  // 1. 讀取土壤濕度（GPIO32，10 次中位數）
+  // 1. 讀取土壤濕度（GPIO34，10 次中位數）
   int moisture_raw = readMedian(SOIL_ADC_PIN);
 
   // 2. 讀取光照（KY-018，GPIO35）
@@ -150,9 +172,9 @@ void publishTelemetry() {
   simFlag = true;
 #endif
 
-  // 4. 取得 Unix 時間戳（WiFi 連線後 ESP32 沒有 NTP，以 millis 秒數替代）
-  //    若需精確時戳，請加入 configTime() / NTPClient 取 NTP 時間。
-  long ts = (long)(millis() / 1000UL);
+  // 4. Unix 時間戳：NTP 校時後 time() 為 epoch；未同步則退回開機秒數
+  time_t nowSec = time(nullptr);
+  long ts = (nowSec > 1700000000) ? (long)nowSec : (long)(millis() / 1000UL);
 
   // 5. 組裝 JSON（ArduinoJson v7）
   JsonDocument doc;
@@ -167,7 +189,7 @@ void publishTelemetry() {
   char payload[256];
   size_t len = serializeJson(doc, payload, sizeof(payload));
 
-  // 6. Publish（QoS 1 在 PubSubClient 中以 retain=false, qos=1 傳入）
+  // 6. Publish（PubSubClient 只支援 QoS 0；第 4 參數為 retain=false）
   bool ok = mqttClient.publish(mqttTopic, (uint8_t*)payload, len, false);
 
   Serial.printf("[Publish] Topic: %s\n", mqttTopic);
@@ -206,6 +228,7 @@ void setup() {
 #endif
 
   connectWiFi();
+  syncTime();      // NTP 校時（取 Unix epoch 供 ts 使用）
   connectMQTT();
 
   Serial.printf("[設定] 發布間隔：%lu 秒\n", PUBLISH_INTERVAL / 1000UL);

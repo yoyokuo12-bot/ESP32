@@ -20,13 +20,13 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 4095,
-      "description": "土壤濕度 ADC 原始值 (GPIO32)"
+      "description": "土壤濕度 ADC 原始值 (GPIO34, input-only ADC1)"
     },
     "light_raw": {
       "type": "integer",
       "minimum": 0,
       "maximum": 4095,
-      "description": "LDR 光照 ADC 原始值 (GPIO33)；選用"
+      "description": "光照 ADC 原始值 (GPIO35, input-only ADC1)；選用"
     },
     "temp_c": {
       "type": "number",

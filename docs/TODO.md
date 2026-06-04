@@ -43,12 +43,12 @@
  目前由 [middleware/mocksource.py](../middleware/mocksource.py)、[tools/mock_publisher.py](../tools/mock_publisher.py) 模擬替代。
 - [x] 模擬資料來源（mocksource：乾旱→澆水→熱浪劇本，標 `sim:true`）
 - [x] 模擬 MQTT 發布器（tools/mock_publisher.py）
-- [ ] 🔒 接線土壤濕度感測器（GPIO32）並讀值
+- [ ] 🔒 接線土壤濕度感測器（GPIO34）並讀值
 - [ ] 🔒 韌體 10 次取樣取中位數
 - [ ] 🔒 `temp_c`/`humidity_pct` 先填模擬值、封包加 `sim:true`
 - [ ] 🔒 Wi-Fi 連線 → 打包 JSON → MQTT publish（`plants/{node}/telemetry`）
 - [ ] 🔒 編譯旗標一鍵切換「真實 ↔ 模擬」感測來源
-- [ ] 🔒 接 BME280（I2C GPIO21/22）與 LDR（GPIO33），移除對應模擬值
+- [ ] 🔒 接 BME280（I2C GPIO21/22）與光照（GPIO35），移除對應模擬值
 - [ ] ⭐ 深度睡眠（選用；省電功能，本專題不做功耗實驗）
 - [ ] 🔒 DoD：實機定時上傳合規 JSON
 
