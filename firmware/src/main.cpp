@@ -241,10 +241,19 @@ void setup() {
 // ─── loop() ──────────────────────────────────────────────────────────
 void loop() {
   static unsigned long lastPublish = 0;
+  static unsigned long lastDebugPrint = 0;
 
   // 保持 MQTT 心跳
   if (!mqttClient.connected()) connectMQTT();
   mqttClient.loop();
+
+  // 🛠️ 硬體即時除錯：每 500ms (半秒) 印出一次原始訊號
+  if (millis() - lastDebugPrint >= 500) {
+    lastDebugPrint = millis();
+    int soilRaw = analogRead(SOIL_ADC_PIN);
+    int lightRaw = analogRead(LIGHT_ADC_PIN);
+    Serial.printf("[即時除錯] 💧 土壤 (P34): %4d  |  ☀️ 光照 (P35): %4d\n", soilRaw, lightRaw);
+  }
 
   // 到達發布間隔時才發布（always-on 模式，MVP 除錯用）
   if (millis() - lastPublish >= PUBLISH_INTERVAL) {
