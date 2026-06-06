@@ -1,5 +1,5 @@
 {
   "_comment": "兩點校準（ESP32 12-bit ADC 0-4095）。土壤：raw 越大越乾，raw_dry=空氣中、raw_wet=泡水。光照(KY-018)：此模組 raw 越小越亮，所以 raw_dark(遮黑,高)>raw_bright(照亮,低)。⚠ 以下為估計值，請看序列埠 [即時除錯] 的 raw，在『空氣/泡水』與『遮黑/照亮』四種情況各讀一個穩定值後替換。",
-  "moisture": { "raw_dry": 2800, "raw_wet": 1000 },
+  "moisture": { "raw_dry": 4095, "raw_wet": 0 },
   "light": { "raw_dark": 4095, "raw_bright": 0 }
 }
