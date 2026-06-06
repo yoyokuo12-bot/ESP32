@@ -15,10 +15,14 @@ import sys
 from . import config, store
 from .pipeline import compute_stats, load_calibration
 from .state import build_state_packet
+from cognition.generator import generate_diary
+from cognition.llm_client import get_client
+
+_LAST_STATE = {}
 
 
-def handle_payload(conn, calib, payload: bytes | str, publish=None) -> dict | None:
-    """處理單筆 telemetry：落地 → 算 stats/state → （可選）回發。回傳 state packet。"""
+def handle_payload(conn, calib, payload: bytes | str, publish=None, client=None) -> dict | None:
+    """處理單筆 telemetry：落地 → 算 stats/state → （可選）生成日記 → （可選）回發。回傳 state packet。"""
     try:
         rec = json.loads(payload)
     except (json.JSONDecodeError, TypeError):
@@ -63,6 +67,23 @@ def handle_payload(conn, calib, payload: bytes | str, publish=None) -> dict | No
     if publish is not None:
         publish(config.STATE_TOPIC_FMT.format(node=rec["node"]),
                 json.dumps(pkt, ensure_ascii=False))
+
+    # --- 串接 L3 生成日記 ---
+    global _LAST_STATE
+    node_id = rec["node"]
+    if client:
+        # 如果是剛啟動或是狀態改變，才觸發生成（避免無限消耗 LLM 額度）
+        if _LAST_STATE.get(node_id) != pkt["state"]:
+            print(f"🌿 狀態改變 ({_LAST_STATE.get(node_id)} -> {pkt['state']})，正在生成新日記...")
+            try:
+                diary = generate_diary(pkt, client=client)
+                diary["stats"] = pkt["stats"]
+                store.insert_diary(conn, diary)
+                _LAST_STATE[node_id] = pkt["state"]
+                print(f"📖 日記已儲存: {diary['diary']}")
+            except Exception as e:
+                print(f"❌ 生成日記失敗: {e}")
+                
     return pkt
 
 
@@ -77,6 +98,7 @@ def main() -> None:
     ap.add_argument("--topic", default=config.TELEMETRY_TOPIC)
     ap.add_argument("--db", default=str(config.DB_PATH))
     ap.add_argument("--no-publish", action="store_true", help="只印 state，不回發 MQTT")
+    ap.add_argument("--provider", default="stub", help="L3 思考引擎：stub(預設)/gemini/openai/ollama")
     args = ap.parse_args()
 
     try:
@@ -87,14 +109,15 @@ def main() -> None:
 
     calib = load_calibration(config.CALIBRATION_PATH)
     conn = store.connect(args.db)
+    llm_client = get_client(args.provider)
 
     def on_connect(client, userdata, flags, reason_code, properties=None):
         print(f"已連線 broker {args.host}:{args.port}，訂閱 {args.topic}")
         client.subscribe(args.topic, qos=1)
 
-    def on_message(client, userdata, msg):
-        publish = None if args.no_publish else (lambda t, p: client.publish(t, p, qos=1))
-        handle_payload(conn, calib, msg.payload, publish=publish)
+    def on_message(mqtt_client, userdata, msg):
+        publish = None if args.no_publish else (lambda t, p: mqtt_client.publish(t, p, qos=1))
+        handle_payload(conn, calib, msg.payload, publish=publish, client=llm_client)
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_connect = on_connect
