@@ -19,3 +19,6 @@ _slides/
 # 個人設定（含 Wi-Fi 密碼），不上傳到 GitHub
 firmware/src/config.h
 
+# PlatformIO 建置產物與下載的函式庫快取（可重建，勿進版控）
+firmware/.pio/
+

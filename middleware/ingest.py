@@ -47,23 +47,6 @@ def handle_payload(conn, calib, payload: bytes | str, publish=None, client=None)
     pkt = build_state_packet(rec["node"], rec["ts"], stats)
     print(json.dumps(pkt, ensure_ascii=False))
 
-    # ---- 觸發 L3 生成日記 (狀態改變時) ----
-    if not hasattr(handle_payload, "last_state"):
-        handle_payload.last_state = {}
-        from cognition.llm_client import get_client
-        handle_payload.client = get_client()
-
-    if pkt["state"] != handle_payload.last_state.get(rec["node"]):
-        handle_payload.last_state[rec["node"]] = pkt["state"]
-        print(f"[{rec['node']}] 狀態改變為 {pkt['state']}，正在呼叫 LLM 生成日記...")
-        try:
-            from cognition.generator import generate_diary
-            diary = generate_diary(pkt, client=handle_payload.client)
-            store.insert_diary(conn, diary)
-            print("日記生成並儲存成功！")
-        except Exception as e:
-            print(f"生成日記失敗: {e}")
-    # ----------------------------------------
     if publish is not None:
         publish(config.STATE_TOPIC_FMT.format(node=rec["node"]),
                 json.dumps(pkt, ensure_ascii=False))
