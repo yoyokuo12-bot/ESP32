@@ -339,32 +339,27 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, "text/plain; charset=utf-8", b"not found")
 
 
-def main() -> None:
+def serve(host: str = "127.0.0.1", port: int = 8000, open_browser: bool = True) -> None:
+    """啟動網頁伺服器（可被 app.demo 等重用，免經過 argparse）。"""
     global _CALIB
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
-    ap = argparse.ArgumentParser(description="呈現層：傳統儀表板 vs 植物日記")
-    ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=8000)
-    ap.add_argument("--no-open", action="store_true", help="啟動時不要自動開啟瀏覽器")
-    args = ap.parse_args()
-
     _CALIB = load_calibration(mw.CALIBRATION_PATH)
     try:
-        srv = ThreadingHTTPServer((args.host, args.port), Handler)
+        srv = ThreadingHTTPServer((host, port), Handler)
     except OSError as e:
-        raise SystemExit(f"無法在 {args.host}:{args.port} 啟動（{e}）。"
+        raise SystemExit(f"無法在 {host}:{port} 啟動（{e}）。"
                          f"埠號可能被占用，改用 --port 8001 再試。")
 
-    host_for_url = "127.0.0.1" if args.host in ("0.0.0.0", "") else args.host
-    url = f"http://{host_for_url}:{args.port}"
+    host_for_url = "127.0.0.1" if host in ("0.0.0.0", "") else host
+    url = f"http://{host_for_url}:{port}"
     print(f"呈現層啟動 → {url}")
     print("瀏覽器不會自動「跳出」是正常的；此終端會持續執行（Ctrl-C 結束）。")
     print("若沒自動開啟，請手動在瀏覽器貼上上面的網址。")
     print("（畫面空白＝尚無資料：在另一個終端執行 python -m app.seed --reset）")
-    if not args.no_open:
+    if open_browser:
         try:
             import webbrowser
             webbrowser.open(url)
@@ -374,6 +369,15 @@ def main() -> None:
         srv.serve_forever()
     except KeyboardInterrupt:
         print("\n已停止")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="呈現層：傳統儀表板 vs 植物日記")
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--no-open", action="store_true", help="啟動時不要自動開啟瀏覽器")
+    args = ap.parse_args()
+    serve(host=args.host, port=args.port, open_browser=not args.no_open)
 
 
 if __name__ == "__main__":
