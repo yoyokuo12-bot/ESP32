@@ -10,9 +10,9 @@
 - 到貨後韌體只要送出符合 [../contracts/telemetry.schema.json](../contracts/telemetry.schema.json) 的封包即可，L2 無須改動。
 
 ## MVP 韌體待辦
-1. 讀 GPIO34 土壤濕度（10 次取樣取中位數）。
+1. 讀 GPIO34 土壤濕度 AO（10 次取樣取中位數）。
 2. `temp_c`/`humidity_pct` 先填模擬值、封包加 `sim:true`。
 3. 打包 JSON → MQTT publish 到 `plants/{node}/telemetry`。
 4. 編譯旗標切換「真實 ↔ 模擬」。
 
-擴充：接 BME280 (I2C GPIO21/22)、光照 (GPIO35)、深度睡眠。
+擴充：接 BME280 (I2C GPIO21/22)、深度睡眠。

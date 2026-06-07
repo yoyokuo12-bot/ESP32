@@ -5,12 +5,12 @@
  * 功能：
  *   F-A1: 讀取 GPIO34 土壤濕度（10 次取樣取中位數）
  *   F-A2: temp_c / humidity_pct 以模擬值填入（MVP 期間，BME280 到貨後改真實讀值）
- *   F-A3: 依 contracts/telemetry.schema.json 打包 JSON，經 MQTT publish（PubSubClient 僅支援 QoS 0）
+ *   F-A3: 依 contracts/telemetry.schema.json 打包 JSON，經 MQTT publish
  *   F-A4: 編譯旗標 USE_REAL_BME280 一鍵切換真實 ↔ 模擬感測來源
  *
  * 硬體接線（Pin Mapping）:
- *   GPIO 34  → 電容式土壤濕度感測器 v2.0（類比輸出 AOUT，input-only ADC1）
- *   GPIO 35  → KY-018 光照（類比輸出，input-only ADC1）
+ *   GPIO 34  → 土壤濕度感測模組 AO（DO 不使用）
+ *   GPIO 35  → KY-018 光敏電阻模組 S
  *   GPIO 21  → BME280 SDA（BME280 到貨後啟用）
  *   GPIO 22  → BME280 SCL（BME280 到貨後啟用）
  *   3V3      → 感測器 VCC
@@ -26,9 +26,8 @@
  */
 
 // ─── 編譯旗標：設為 1 時啟用真實 BME280，0 時使用模擬值 ────────────
-// PlatformIO 可用 build_flags「-D USE_REAL_BME280=1」覆寫；以下僅為未指定時的預設。
 #ifndef USE_REAL_BME280
-#define USE_REAL_BME280  0   // Arduino IDE 請直接在這裡改 0/1
+#define USE_REAL_BME280  0   // BME280 到貨後改成 1，或由 platformio.ini 的 build_flags 設定
 #endif
 
 // ─── Wi-Fi / MQTT 設定 ── 請見 config.h（複製 config.example.h 填入）────
@@ -47,13 +46,13 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <algorithm>   // std::sort
-#include <time.h>      // NTP 校時 / Unix epoch
 #include "config.h"    // Wi-Fi / MQTT 個人設定（已加入 .gitignore）
 
 #if USE_REAL_BME280
   #include <Wire.h>
   #include <Adafruit_BME280.h>
   Adafruit_BME280 bme;
+  bool bmeReady = false;
 #endif
 
 // ─── 全域物件 ────────────────────────────────────────────────────────
@@ -116,24 +115,6 @@ void connectMQTT() {
   }
 }
 
-// ─── NTP 校時：取得 Unix epoch 時間（供 ts 使用）────────────────────
-void syncTime() {
-  configTime(0, 0, "pool.ntp.org", "time.google.com");  // UTC
-  Serial.print("[NTP] 校時中");
-  time_t now = time(nullptr);
-  int tries = 0;
-  while (now < 1700000000 && tries < 20) {  // 等到時間 > 2023 視為已同步
-    delay(500);
-    Serial.print(".");
-    now = time(nullptr);
-    tries++;
-  }
-  if (now < 1700000000)
-    Serial.println("\n[NTP] 校時失敗；ts 暫退回開機秒數（時間不準）");
-  else
-    Serial.printf("\n[NTP] 完成，epoch=%ld\n", (long)now);
-}
-
 // ─── 模擬溫濕度（MVP 期間 BME280 未到貨時使用）─────────────────────
 /**
  * 以正弦函數模擬日夜溫度變化（22–28°C），
@@ -164,20 +145,25 @@ void publishTelemetry() {
   bool  simFlag = false;
 
 #if USE_REAL_BME280
-  temp_c       = bme.readTemperature();
-  humidity_pct = bme.readHumidity();
-  simFlag      = false;
+  if (bmeReady) {
+    temp_c       = bme.readTemperature();
+    humidity_pct = bme.readHumidity();
+    simFlag      = false;
+  } else {
+    getSimulatedTempHumidity(temp_c, humidity_pct);
+    simFlag = true;
+  }
 #else
   getSimulatedTempHumidity(temp_c, humidity_pct);
   simFlag = true;
 #endif
 
-  // 4. Unix 時間戳：NTP 校時後 time() 為 epoch；未同步則退回開機秒數
-  time_t nowSec = time(nullptr);
-  long ts = (nowSec > 1700000000) ? (long)nowSec : (long)(millis() / 1000UL);
+  // 4. 取得 Unix 時間戳（WiFi 連線後 ESP32 沒有 NTP，以 millis 秒數替代）
+  //    若需精確時戳，請加入 configTime() / NTPClient 取 NTP 時間。
+  long ts = (long)(millis() / 1000UL);
 
-  // 5. 組裝 JSON（ArduinoJson v7）
-  JsonDocument doc;
+  // 5. 組裝 JSON（ArduinoJson v6）
+  StaticJsonDocument<256> doc;
   doc["node"]         = NODE_ID;
   doc["ts"]           = ts;
   doc["moisture_raw"] = moisture_raw;
@@ -189,7 +175,7 @@ void publishTelemetry() {
   char payload[256];
   size_t len = serializeJson(doc, payload, sizeof(payload));
 
-  // 6. Publish（PubSubClient 只支援 QoS 0；第 4 參數為 retain=false）
+  // 6. Publish（PubSubClient 預設 QoS 0，retain=false）
   bool ok = mqttClient.publish(mqttTopic, (uint8_t*)payload, len, false);
 
   Serial.printf("[Publish] Topic: %s\n", mqttTopic);
@@ -216,19 +202,20 @@ void setup() {
     // 若位址 0x76 不通，嘗試 0x77（視模組 SDO 接腳決定）
     if (!bme.begin(0x77)) {
       Serial.println("[BME280] 初始化失敗！確認接線與位址。");
-      // 不 halt，改為回退模擬值
+      bmeReady = false;
     } else {
       Serial.println("[BME280] 初始化成功（位址 0x77）");
+      bmeReady = true;
     }
   } else {
     Serial.println("[BME280] 初始化成功（位址 0x76）");
+    bmeReady = true;
   }
 #else
   Serial.println("[模式] 溫濕度使用模擬資料（USE_REAL_BME280=0）");
 #endif
 
   connectWiFi();
-  syncTime();      // NTP 校時（取 Unix epoch 供 ts 使用）
   connectMQTT();
 
   Serial.printf("[設定] 發布間隔：%lu 秒\n", PUBLISH_INTERVAL / 1000UL);
@@ -241,19 +228,10 @@ void setup() {
 // ─── loop() ──────────────────────────────────────────────────────────
 void loop() {
   static unsigned long lastPublish = 0;
-  static unsigned long lastDebugPrint = 0;
 
   // 保持 MQTT 心跳
   if (!mqttClient.connected()) connectMQTT();
   mqttClient.loop();
-
-  // 🛠️ 硬體即時除錯：每 500ms (半秒) 印出一次原始訊號
-  if (millis() - lastDebugPrint >= 500) {
-    lastDebugPrint = millis();
-    int soilRaw = analogRead(SOIL_ADC_PIN);
-    int lightRaw = analogRead(LIGHT_ADC_PIN);
-    Serial.printf("[即時除錯] 💧 土壤 (P34): %4d  |  ☀️ 光照 (P35): %4d\n", soilRaw, lightRaw);
-  }
 
   // 到達發布間隔時才發布（always-on 模式，MVP 除錯用）
   if (millis() - lastPublish >= PUBLISH_INTERVAL) {

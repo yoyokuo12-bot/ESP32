@@ -17,7 +17,7 @@
 | 加分 | 多盆栽、不同人格、數據趨勢圖 |
 | 不在範圍 | 自動澆水/致動器（本專題刻意保留 Human-in-the-loop） |
 
-**已定案（2026-06）：** ① 目前範圍＝MVP，實體感測**僅土壤濕度（GPIO34）**。② 溫濕度感測器選定 **BME280**。
+**已定案（2026-06）：** ① 目前範圍＝MVP，實體感測包含**土壤濕度（GPIO34）**與 **KY-018 光照（GPIO35）**。② 溫濕度感測器選定 **BME280**。
 **硬體缺料對策：** 完整專題需要溫濕度資料，但 BME280 目前不易取得，故**暫以模擬資料替代**（韌體填模擬值，或用 `tools/mock_publisher.py` 產生整包模擬 telemetry）。介面與 schema 不變，到貨後換實測即可，L2/L3 無須改動；模擬封包以 `sim:true` 標記（見 §2.1）。
 
 ---
@@ -27,7 +27,7 @@
 與 [../CLAUDE.md §6](../CLAUDE.md) 一致；此為**契約測試**的依據，任一方修改須全員同意。
 
 ### 2.1 L1 → L2 Telemetry（MQTT）
-- Topic：`plants/{node_id}/telemetry`、QoS 1（注意：ESP32 端 PubSubClient 只支援 QoS 0 發布；broker 與 L2 訂閱用 QoS 1）
+- Topic：`plants/{node_id}/telemetry`、QoS 1
 - Schema（`contracts/telemetry.schema.json`）：
 
 | 欄位 | 型別 | 單位/說明 |
@@ -82,11 +82,11 @@
 
 | GPIO | 介面 | 接到 |
 |---|---|---|
-| GPIO 34 | ADC1（input-only） | 土壤濕度 |
-| GPIO 35 | ADC1（input-only） | 光照（KY-018） |
+| GPIO 34 | ADC | 土壤濕度 AO |
+| GPIO 35 | ADC | KY-018 光照 S |
 | GPIO 21 / 22 | I2C (SDA/SCL) | BME280 |
 
- MVP 只使用 **GPIO 34（土壤濕度）**；GPIO35（光照）與 GPIO21/22（BME280）待擴充時啟用。GPIO34/35 為 input-only ADC1，與 Wi-Fi 不衝突。
+ MVP 使用 **GPIO34（土壤濕度 AO）** 與 **GPIO35（KY-018 光照 S）**；GPIO21/22（BME280）待擴充時啟用。
 
 ---
 
@@ -97,12 +97,12 @@
 ### 角色 A — 韌體 / 邊緣感測 (`firmware/`)
 - **負責：** ESP32 感測、濾波、MQTT 上傳、（擴充）深度睡眠。
 - **MVP 需求（現階段）：**
-  - F-A1：讀取 **GPIO34 土壤濕度**；10 次取樣取**中位數**。
+  - F-A1：讀取 **GPIO34 土壤濕度 AO**；10 次取樣取**中位數**。
   - F-A2：`temp_c`/`humidity_pct` 以**模擬值**填入（合理區間隨機/正弦變化），封包加 `sim:true`，維持 §2.1 schema 完整。
   - F-A3：依 §2.1 打包 JSON、經 MQTT publish（QoS 1）；定時迴圈上傳（**MVP 先不睡眠**，always-on 較好除錯）。
   - F-A4：以**編譯旗標／設定檔**一鍵切換「真實 ↔ 模擬」感測來源，方便 BME280 到貨後無痛換真值。
 - **擴充需求（硬體到貨後）：**
-  - F-A5：接 BME280（I2C，GPIO21/22）與光照感測（GPIO35），對應欄位由模擬改實測、移除 `sim` 旗標。
+  - F-A5：接 BME280（I2C，GPIO21/22），對應欄位由模擬改實測、移除 `sim` 旗標。
   - F-A6：上傳後 `esp_deep_sleep_start()`，RTC 每 **4 小時**喚醒、Active 3–5 秒；Wi-Fi 連線逾時與重試上限。
 - **驗收（MVP）：** 實機定時上傳合規 JSON（moisture 實測、溫濕度 `sim:true`），L2 能正常解析。
 - **驗收（完整）：** 三感測皆實測、定時上傳。
