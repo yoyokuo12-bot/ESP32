@@ -46,7 +46,7 @@ def raw_to_light_pct(raw: float, calib: dict) -> float:
     dark, bright = float(l["raw_dark"]), float(l["raw_bright"])
     if bright == dark:
         return 0.0
-    return _clamp((float(raw) - dark) / (bright - dark) * 100.0)
+    return _clamp((dark - float(raw)) / (dark - bright) * 100.0)
 
 
 def median_filter(values: Iterable[float]) -> float:
